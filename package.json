@@ -1,8 +1,27 @@
 {
-  "name": "tenis-blit386",
+  "name": "pong-on-blit386",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "A two-player Pong game on a single keyboard, built with the BLIT386 retro engine.",
+  "keywords": [
+    "pong",
+    "game",
+    "blit386",
+    "retro",
+    "webgpu",
+    "vite"
+  ],
+  "author": "@bzzzwa together with Claude Opus 4.8",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bzzzwa/Pong-on-Blit386.git"
+  },
+  "homepage": "https://github.com/bzzzwa/Pong-on-Blit386#readme",
+  "bugs": {
+    "url": "https://github.com/bzzzwa/Pong-on-Blit386/issues"
+  },
   "engines": {
     "node": ">=22.18.0"
   },

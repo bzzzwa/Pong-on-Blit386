@@ -1,46 +1,46 @@
-// Tenis - dvouhráčová hra typu Pong pro BLIT386.
+// Pong - a two-player Pong game for BLIT386.
 //
-// Dva hráči na jedné klávesnici:
-//   Hráč 1 (levá pálka):  W = nahoru, S = dolů
-//   Hráč 2 (pravá pálka): šipka nahoru / šipka dolů
-//   Mezerník = podání míče (na začátku a po každém bodu)
+// Two players on a single keyboard:
+//   Player 1 (left paddle):  W = up, S = down
+//   Player 2 (right paddle): Arrow Up / Arrow Down
+//   Space = serve the ball (at the start and after each point)
 //
-// Míč je čtvereček, pálky jsou obdélníky, které se pohybují nahoru a dolů
-// podél levé a pravé stěny. Kdo dosáhne WIN_SCORE bodů, vyhrává.
+// The ball is a small square; the paddles are rectangles that move up and
+// down along the left and right walls. First to WIN_SCORE points wins.
 //
-// Struktura každé BLIT386 hry je jedna třída se čtyřmi metodami:
-//   configure() - jednou, nastaví velikost obrazovky a FPS
-//   init()      - jednou na startu, nastaví barvy a výchozí stav
-//   update()    - ~60x/s, čte vstup, hýbe věcmi, řeší kolize a skóre
-//   render()    - ~60x/s, vykreslí aktuální stav
+// Every BLIT386 game is a single class with four methods:
+//   configure() - once, sets the screen size and FPS
+//   init()      - once at startup, sets up colors and the initial state
+//   update()    - ~60x/s, reads input, moves things, resolves collisions and score
+//   render()    - ~60x/s, draws the current state
 
 import { bootstrap, BT, Color32, Rect2i, Vector2i } from 'blit386';
 
-// --- Barevné sloty (skutečné barvy nastavíme v init()) --------------------
-// Slot 0 je vždy průhledný, proto začínáme od 1.
-const COLOR_BG = 1; // pozadí
-const COLOR_FG = 2; // pálky, míč, střední čára
-const COLOR_TEXT = 3; // skóre a texty
+// --- Color slots (real colors are assigned in init()) ---------------------
+// Slot 0 is always transparent, so we start at 1.
+const COLOR_BG = 1; // background
+const COLOR_FG = 2; // paddles, ball, center line
+const COLOR_TEXT = 3; // score and messages
 
-// --- Rozměry a rychlosti (nejzábavnější knoflíky k ladění) ----------------
+// --- Sizes and speeds (the fun knobs to tweak) ----------------------------
 const SCREEN_W = 320;
 const SCREEN_H = 240;
 
-const PADDLE_W = 6; // šířka pálky
-const PADDLE_H = 40; // výška pálky
-const PADDLE_SPEED = 3; // o kolik pixelů se pálka posune za krok
-const PADDLE_MARGIN = 10; // odsazení pálky od boční stěny
+const PADDLE_W = 6; // paddle width
+const PADDLE_H = 40; // paddle height
+const PADDLE_SPEED = 3; // how many pixels the paddle moves per step
+const PADDLE_MARGIN = 10; // paddle offset from the side wall
 
-const BALL_SIZE = 6; // strana čtverečku míče
-const BALL_SPEED_X = 3; // vodorovná rychlost míče
-const BALL_START_SPEED_Y = 2; // svislá rychlost míče při podání
+const BALL_SIZE = 6; // side of the ball square
+const BALL_SPEED_X = 3; // horizontal ball speed
+const BALL_START_SPEED_Y = 2; // vertical ball speed on serve
 
-const WIN_SCORE = 11; // kolik bodů znamená výhru
+const WIN_SCORE = 11; // how many points it takes to win
 
-// Stavy hry
-const STATE_SERVE = 'serve'; // čeká se na podání (mezerník)
-const STATE_PLAY = 'play'; // míč je ve hře
-const STATE_OVER = 'over'; // někdo vyhrál
+// Game states
+const STATE_SERVE = 'serve'; // waiting for a serve (Space)
+const STATE_PLAY = 'play'; // the ball is in play
+const STATE_OVER = 'over'; // someone has won
 
 class Game {
     configure() {
@@ -51,14 +51,14 @@ class Game {
     }
 
     async init() {
-        // Paleta barev - retro černobílé ladění.
+        // Color palette - retro black-and-white look.
         const palette = BT.paletteCreate(16);
-        palette.set(COLOR_BG, new Color32(12, 14, 20)); // téměř černá
-        palette.set(COLOR_FG, new Color32(235, 240, 255)); // téměř bílá
-        palette.set(COLOR_TEXT, new Color32(120, 200, 160)); // tlumená zelená
+        palette.set(COLOR_BG, new Color32(12, 14, 20)); // near black
+        palette.set(COLOR_FG, new Color32(235, 240, 255)); // near white
+        palette.set(COLOR_TEXT, new Color32(120, 200, 160)); // muted green
         BT.paletteSet(palette);
 
-        // Levá pálka (hráč 1) a pravá pálka (hráč 2), obě svisle vystředěné.
+        // Left paddle (player 1) and right paddle (player 2), both centered vertically.
         const paddleY = Math.floor((SCREEN_H - PADDLE_H) / 2);
         this.leftPaddle = new Rect2i(PADDLE_MARGIN, paddleY, PADDLE_W, PADDLE_H);
         this.rightPaddle = new Rect2i(
@@ -68,16 +68,16 @@ class Game {
             PADDLE_H,
         );
 
-        // Míč a jeho směr.
+        // The ball and its direction.
         this.ball = new Rect2i(0, 0, BALL_SIZE, BALL_SIZE);
         this.ballDX = 0;
         this.ballDY = 0;
 
-        // Skóre.
+        // Score.
         this.scoreLeft = 0;
         this.scoreRight = 0;
 
-        // Kdo podává jako první (1 = doleva, tj. míč letí k hráči 1).
+        // Who serves first (-1 = to the left, i.e. the ball flies toward player 1).
         this.serveDir = Math.random() < 0.5 ? -1 : 1;
 
         this.state = STATE_SERVE;
@@ -87,7 +87,7 @@ class Game {
         return true;
     }
 
-    // Postaví míč doprostřed a zastaví ho (připraven k podání).
+    // Places the ball in the center and stops it (ready to serve).
     centerBall() {
         this.ball.x = Math.floor((SCREEN_W - BALL_SIZE) / 2);
         this.ball.y = Math.floor((SCREEN_H - BALL_SIZE) / 2);
@@ -95,15 +95,15 @@ class Game {
         this.ballDY = 0;
     }
 
-    // Rozehraje míč směrem podle serveDir (-1 doleva, +1 doprava).
+    // Launches the ball in the serveDir direction (-1 left, +1 right).
     serveBall() {
         this.ballDX = BALL_SPEED_X * this.serveDir;
-        // Náhodný svislý směr, ať to není pokaždé stejné.
+        // Random vertical direction so it isn't the same every time.
         this.ballDY = Math.random() < 0.5 ? -BALL_START_SPEED_Y : BALL_START_SPEED_Y;
         this.state = STATE_PLAY;
     }
 
-    // Posune pálku o dané delta a udrží ji na obrazovce.
+    // Moves a paddle by the given delta and keeps it on screen.
     movePaddle(paddle, delta) {
         paddle.y += delta;
         if (paddle.y < 0) {
@@ -116,15 +116,15 @@ class Game {
     }
 
     update() {
-        // --- Ovládání pálek (funguje ve všech stavech, ať se hráči rozehřejí) ---
-        // Hráč 1: W / S
+        // --- Paddle controls (active in every state, so players can warm up) ---
+        // Player 1: W / S
         if (BT.isKeyDown('KeyW')) {
             this.movePaddle(this.leftPaddle, -PADDLE_SPEED);
         }
         if (BT.isKeyDown('KeyS')) {
             this.movePaddle(this.leftPaddle, PADDLE_SPEED);
         }
-        // Hráč 2: šipky nahoru / dolů
+        // Player 2: Arrow Up / Arrow Down
         if (BT.isKeyDown('ArrowUp')) {
             this.movePaddle(this.rightPaddle, -PADDLE_SPEED);
         }
@@ -132,9 +132,9 @@ class Game {
             this.movePaddle(this.rightPaddle, PADDLE_SPEED);
         }
 
-        // --- Stavová logika ---
+        // --- State logic ---
         if (this.state === STATE_SERVE) {
-            // Míč drží uprostřed, dokud někdo nezmáčkne mezerník.
+            // The ball stays centered until someone presses Space.
             if (BT.isKeyPressed('Space')) {
                 this.serveBall();
             }
@@ -142,7 +142,7 @@ class Game {
         }
 
         if (this.state === STATE_OVER) {
-            // Mezerník spustí novou hru od nuly.
+            // Space starts a fresh game from zero.
             if (BT.isKeyPressed('Space')) {
                 this.scoreLeft = 0;
                 this.scoreRight = 0;
@@ -154,11 +154,11 @@ class Game {
             return;
         }
 
-        // --- STATE_PLAY: pohyb míče ---
+        // --- STATE_PLAY: move the ball ---
         this.ball.x += this.ballDX;
         this.ball.y += this.ballDY;
 
-        // Odraz od horní a dolní stěny.
+        // Bounce off the top and bottom walls.
         if (this.ball.y <= 0) {
             this.ball.y = 0;
             this.ballDY = Math.abs(this.ballDY);
@@ -169,9 +169,10 @@ class Game {
             this.ballDY = -Math.abs(this.ballDY);
         }
 
-        // Odraz od pálek. Míč musí letět směrem k pálce, jinak by se "zasekl".
+        // Bounce off the paddles. The ball must be heading toward the paddle,
+        // otherwise it could get "stuck".
         if (this.ballDX < 0 && this.ball.isIntersecting(this.leftPaddle)) {
-            this.ball.x = this.leftPaddle.x + PADDLE_W; // vytlač míč před pálku
+            this.ball.x = this.leftPaddle.x + PADDLE_W; // push the ball in front of the paddle
             this.ballDX = Math.abs(this.ballDX);
             this.applyPaddleSpin(this.leftPaddle);
         } else if (this.ballDX > 0 && this.ball.isIntersecting(this.rightPaddle)) {
@@ -180,13 +181,13 @@ class Game {
             this.applyPaddleSpin(this.rightPaddle);
         }
 
-        // Míč přeletěl levou stěnu -> bod pro hráče 2 (vpravo).
+        // Ball flew past the left wall -> point for player 2 (right).
         if (this.ball.x + BALL_SIZE < 0) {
             this.scoreRight += 1;
-            this.serveDir = -1; // podává se směrem k tomu, kdo dostal bod
+            this.serveDir = -1; // serve toward whoever conceded the point
             this.afterPoint();
         }
-        // Míč přeletěl pravou stěnu -> bod pro hráče 1 (vlevo).
+        // Ball flew past the right wall -> point for player 1 (left).
         else if (this.ball.x > SCREEN_W) {
             this.scoreLeft += 1;
             this.serveDir = 1;
@@ -194,22 +195,22 @@ class Game {
         }
     }
 
-    // Přidá míči svislý "spin" podle toho, kam na pálku dopadl.
-    // Zásah u kraje pálky odráží prudčeji než zásah doprostřed.
+    // Adds vertical "spin" to the ball based on where it hit the paddle.
+    // A hit near the paddle edge bounces more sharply than a hit in the middle.
     applyPaddleSpin(paddle) {
         const ballCenter = this.ball.y + BALL_SIZE / 2;
         const paddleCenter = paddle.y + PADDLE_H / 2;
         const offset = ballCenter - paddleCenter; // -PADDLE_H/2 .. +PADDLE_H/2
-        // Namapuj offset na svislou rychlost -3..+3.
+        // Map the offset onto a vertical speed of -3..+3.
         const spin = Math.round((offset / (PADDLE_H / 2)) * 3);
         this.ballDY = spin;
-        // Nedovol nulovou svislou rychlost, ať míč není nudně vodorovný.
+        // Never allow zero vertical speed, so the ball isn't boringly horizontal.
         if (this.ballDY === 0) {
             this.ballDY = Math.random() < 0.5 ? -1 : 1;
         }
     }
 
-    // Vyhodnotí konec výměny: buď výhra, nebo nové podání.
+    // Evaluates the end of a rally: either a win or a new serve.
     afterPoint() {
         if (this.scoreLeft >= WIN_SCORE) {
             this.winner = 1;
@@ -224,39 +225,39 @@ class Game {
     }
 
     render() {
-        // Pozadí (zároveň smaže minulý snímek).
+        // Background (also erases the previous frame).
         BT.clear(COLOR_BG);
 
-        // Přerušovaná střední čára.
+        // Dashed center line.
         const midX = Math.floor((SCREEN_W - 2) / 2);
         for (let y = 4; y < SCREEN_H; y += 12) {
             BT.drawRectFill(new Rect2i(midX, y, 2, 6), COLOR_FG);
         }
 
-        // Pálky.
+        // Paddles.
         BT.drawRectFill(this.leftPaddle, COLOR_FG);
         BT.drawRectFill(this.rightPaddle, COLOR_FG);
 
-        // Míč.
+        // Ball.
         BT.drawRectFill(this.ball, COLOR_FG);
 
-        // Skóre nahoře, po stranách od středu.
+        // Score at the top, on either side of the center.
         const leftScore = `${this.scoreLeft}`;
         const rightScore = `${this.scoreRight}`;
         BT.systemPrint(new Vector2i(midX - 40, 8), COLOR_TEXT, leftScore);
         BT.systemPrint(new Vector2i(midX + 30, 8), COLOR_TEXT, rightScore);
 
-        // Nápovědy podle stavu.
+        // State-dependent hints.
         if (this.state === STATE_SERVE) {
-            this.printCentered(SCREEN_H - 24, 'MEZERNIK = PODANI');
+            this.printCentered(SCREEN_H - 24, 'SPACE = SERVE');
         } else if (this.state === STATE_OVER) {
-            const who = this.winner === 1 ? 'HRAC 1' : 'HRAC 2';
-            this.printCentered(90, `${who} VYHRAL!`);
-            this.printCentered(110, 'MEZERNIK = NOVA HRA');
+            const who = this.winner === 1 ? 'PLAYER 1' : 'PLAYER 2';
+            this.printCentered(90, `${who} WINS!`);
+            this.printCentered(110, 'SPACE = NEW GAME');
         }
     }
 
-    // Pomůcka: vytiskne text vodorovně vystředěný.
+    // Helper: prints text horizontally centered.
     printCentered(y, text) {
         const size = BT.systemPrintMeasure(text);
         const x = Math.floor((SCREEN_W - size.x) / 2);
