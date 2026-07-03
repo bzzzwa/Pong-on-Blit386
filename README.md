@@ -5,6 +5,8 @@ A two-player Pong game played on a single keyboard, built with the
 paddles are rectangles sliding up and down along the left and right walls —
 first player to 11 points wins.
 
+**▶ Play it in your browser: <https://bzzzwa.github.io/Pong-on-Blit386/>**
+
 ## Controls
 
 | Action | Player 1 (left paddle) | Player 2 (right paddle) |
@@ -39,14 +41,27 @@ npm run build     # produce a production build in dist/
 npm run preview   # serve the production build locally
 ```
 
+## Deployment
+
+The game is deployed to GitHub Pages automatically. Every push to `main`
+triggers the workflow in `.github/workflows/deploy.yml`, which builds the
+project and publishes `dist/` to Pages.
+
+The site is served from a sub-path (`/Pong-on-Blit386/`), so `vite.config.js`
+sets `base` to match. If you fork this project under a different repository
+name, update that `base` value accordingly.
+
 ## Project structure
 
 ```
 .
+├── .github/
+│   └── workflows/
+│       └── deploy.yml  # builds and deploys to GitHub Pages
 ├── index.html        # page host and canvas scaling
 ├── src/
 │   └── game.js       # the whole game: configure / init / update / render
-├── vite.config.js    # dev-server config
+├── vite.config.js    # dev-server config and Pages base path
 ├── jsconfig.json     # editor type-checking settings
 ├── package.json
 └── LICENSE
